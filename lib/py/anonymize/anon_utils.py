@@ -27,3 +27,14 @@ def anonymize_path(path):
     if path.endswith('/'):
         anon_path += '/'
     return anon_path
+
+
+__proc_map = {}
+
+def anonymize_proc(proc_name):
+    global __proc_map
+    if proc_name not in __proc_map:
+        proc_id = len(__proc_map)
+        __proc_map[proc_name] = proc_id
+    proc_id = __proc_map[proc_name]
+    return 'anon_proc' + str(proc_id)
