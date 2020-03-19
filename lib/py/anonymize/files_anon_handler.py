@@ -1,6 +1,8 @@
-
+from .anon_utils import anonymize_path
 
 def reg_handler(entry):
+    path = entry['name']
+    entry['name'] = anonymize_path(path)
     return entry
 
 def inet_sk_entry(entry):
