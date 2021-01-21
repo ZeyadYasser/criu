@@ -174,6 +174,17 @@ struct cr_options {
 
 	/* This stores which method to use for file validation. */
 	int 			file_validation_method;
+
+	/*
+	 * Those are the two ends of a unix socket pair which
+	 * are used to send pidfds between pre-dump/dump iterations.
+	 * Sending tasks pidfds to pidfd_out_fd in send_pidfd_entry() and
+	 * receiving them in the next iteration from pidfd_in_fd in
+	 * init_pidfd_hash().
+	 * These pidfds will be used later in detect_pid_reuse().
+	 */
+	int			pidfd_in_fd;
+	int			pidfd_out_fd;
 };
 
 extern struct cr_options opts;

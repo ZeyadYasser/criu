@@ -1782,3 +1782,25 @@ int criu_get_orphan_pts_master_fd(void)
 {
 	return orphan_pts_master_fd;
 }
+
+void criu_local_set_pidfd_in_fd(criu_opts *opts, int fd)
+{
+	opts->rpc->has_pidfd_in_fd = true;
+	opts->rpc->pidfd_in_fd = fd;
+}
+
+void criu_set_pidfd_in_fd(int fd)
+{
+	criu_local_set_pidfd_in_fd(global_opts, fd);
+}
+
+void criu_local_set_pidfd_out_fd(criu_opts *opts, int fd)
+{
+	opts->rpc->has_pidfd_out_fd = true;
+	opts->rpc->pidfd_out_fd = fd;
+}
+
+void criu_set_pidfd_out_fd(int fd)
+{
+	criu_local_set_pidfd_out_fd(global_opts, fd);
+}

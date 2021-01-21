@@ -688,6 +688,12 @@ static int setup_opts_from_req(int sk, CriuOpts *req)
 		}
 	}
 
+	if (req->has_pidfd_in_fd)
+		opts.pidfd_in_fd = req->pidfd_in_fd;
+
+	if (req->has_pidfd_out_fd)
+		opts.pidfd_out_fd = req->pidfd_out_fd;
+
 	if (req->orphan_pts_master)
 		opts.orphan_pts_master = true;
 

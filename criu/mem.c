@@ -30,9 +30,137 @@
 #include "fault-injection.h"
 #include "prctl.h"
 #include "compel/infect-util.h"
+#include "compel/plugins/std/syscall-codes.h"
+#include "common/scm.h"
 
 #include "protobuf.h"
 #include "images/pagemap.pb-c.h"
+
+struct pidfd_entry {
+	pid_t				pid;
+	int					pidfd;
+	struct hlist_node	hash; /* To lookup pidfd by pid */
+};
+
+#define PIDFD_HASH_SIZE	32
+static struct hlist_head pidfd_hash[PIDFD_HASH_SIZE];
+
+void free_pidfd_hash(void)
+{
+	int i;
+	struct pidfd_entry *entry;
+
+	for (i = 0; i < PIDFD_HASH_SIZE; i++) {
+		hlist_for_each_entry(entry, &pidfd_hash[i], hash)
+			xfree(entry);
+	}
+}
+
+int init_pidfd_hash(void)
+{
+	int i, ret;
+	struct pidfd_entry *entry;
+
+	for (i = 0; i < PIDFD_HASH_SIZE; i++)
+		INIT_HLIST_HEAD(&pidfd_hash[i]);
+
+	if (opts.pidfd_in_fd == -1)
+		return 0;
+
+	while (1) {
+		entry = xmalloc(sizeof(struct pidfd_entry));
+		INIT_HLIST_NODE(&entry->hash);
+
+		ret = __recv_fds(opts.pidfd_in_fd, &entry->pidfd, 1, &entry->pid, sizeof(pid_t), MSG_DONTWAIT);
+		if (ret == -EAGAIN || ret == -EWOULDBLOCK) {
+			/* no more fds to read */
+			xfree(entry);
+			return 0;
+		} else if (ret) {
+			pr_perror("Can't read pidfd");
+			xfree(entry);
+			goto err;
+		}
+
+		hlist_add_head(&entry->hash, &pidfd_hash[entry->pid % PIDFD_HASH_SIZE]);
+	}
+
+err:
+	free_pidfd_hash();
+	return ret;
+}
+
+static struct pidfd_entry *find_pidfd_entry_by_pid(pid_t pid)
+{
+	struct pidfd_entry *entry;
+	struct hlist_head *chain;
+
+	chain = &pidfd_hash[pid % PIDFD_HASH_SIZE];
+	hlist_for_each_entry(entry, chain, hash) {
+		if (entry->pid == pid)
+			return entry;
+	}
+
+	return NULL;
+}
+
+/*
+ * 1	pid closed
+ * 0	pid still running
+ * -1	error
+ */
+static int is_pid_closed(int pidfd)
+{
+	struct pollfd pollfd;
+	int ret;
+
+	/*
+	 * When there is data to read from the pidfd, it means
+	 * that the task associated with this pidfd is closed.
+	 */
+	pollfd.fd = pidfd;
+	pollfd.events = POLLIN;
+
+	while (1) {
+		ret = poll(&pollfd, 1, 0);
+		if (errno == EINTR)
+			continue; // restart polling
+
+		return ret;
+	}
+}
+
+int send_pidfd_entry(pid_t pid)
+{
+	int pidfd, ret;
+	struct pidfd_entry *entry;
+
+	/* get existing pidfd or create pidfd for task */
+	entry = find_pidfd_entry_by_pid(pid);
+	if (entry == NULL) {
+		if (!kdat.has_pidfd_open) {
+			pr_err("pidfd_open syscall is not supported");
+			return -1;
+		}
+
+		ret = syscall(SYS_pidfd_open, pid, 0);
+		if (ret == -1) {
+			pr_perror("Can't get pidfd of (pid: %d)", pid);
+			return ret;
+		}
+		pidfd = ret;
+	} else {
+		pidfd = entry->pidfd;
+	}
+
+	ret = send_fds(opts.pidfd_out_fd, NULL, 0, &pidfd, 1, &pid, sizeof(pid_t));
+	if (ret) {
+		pr_perror("Can't send pidfd");
+		return ret;
+	}
+
+	return 0;
+}
 
 static int task_reset_dirty_track(int pid)
 {
@@ -313,8 +441,30 @@ static int detect_pid_reuse(struct pstree_item *item,
 {
 	unsigned long long dump_ticks;
 	struct proc_pid_stat pps_buf;
+	struct pidfd_entry *entry;
 	unsigned long long tps; /* ticks per second */
 	int ret;
+
+	if (opts.pidfd_in_fd != -1) {
+		entry = find_pidfd_entry_by_pid(item->pid->real);
+		if (entry == NULL) {
+			pr_err("Pid-reuse detection failed: no pidfd entry found " \
+			       "for pid %d\n", item->pid->real);
+			return -1;
+		}
+
+		/*
+		 * If we detect pid reuse here we are sure it is a valid
+		 * detection becuase we use pidfds, so we return -1 to
+		 * exit with error.
+		 */
+		if (is_pid_closed(entry->pidfd)) {
+			pr_err("Pid reuse detected for pid %d\n", item->pid->real);
+			return -1;
+		} else {
+			return 0;
+		}
+	}
 
 	if (!parent_ie) {
 		pr_err("Pid-reuse detection failed: no parent inventory, " \

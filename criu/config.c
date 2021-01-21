@@ -281,6 +281,8 @@ void init_opts(void)
 	opts.log_level = DEFAULT_LOGLEVEL;
 	opts.pre_dump_mode = PRE_DUMP_SPLICE;
 	opts.file_validation_method = FILE_VALIDATION_DEFAULT;
+	opts.pidfd_in_fd = -1;
+	opts.pidfd_out_fd = -1;
 }
 
 bool deprecated_ok(char *what)
@@ -541,6 +543,8 @@ int parse_options(int argc, char **argv, bool *usage_error,
 		{ "cgroup-yard",		required_argument,	0, 1096 },
 		{ "pre-dump-mode",		required_argument,	0, 1097},
 		{ "file-validation",		required_argument,	0, 1098	},
+		{ "pidfd-in-fd",		required_argument,	0, 1099 },
+		{ "pidfd-out-fd",		required_argument,	0, 1100 },
 		{ },
 	};
 
@@ -869,6 +873,12 @@ int parse_options(int argc, char **argv, bool *usage_error,
 		case 1098:
 			if (parse_file_validation_method(&opts, optarg))
 				return 2;
+			break;
+		case 1099:
+			opts.pidfd_in_fd = atoi(optarg);
+			break;
+		case 1100:
+			opts.pidfd_out_fd = atoi(optarg);
 			break;
 		case 'V':
 			pr_msg("Version: %s\n", CRIU_VERSION);

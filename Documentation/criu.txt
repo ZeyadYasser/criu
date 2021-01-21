@@ -179,6 +179,14 @@ In addition, *page-server* options may be specified.
     syscall. The 'read' mode incurs reduced frozen time and reduced
     memory pressure as compared to 'splice' mode. Default is 'splice' mode.
 
+*--pidfd-in-fd* 'fd'::
+    Use specified unix socket FD to receive tasks pidfds between
+    pre-dump/dump iterations for pid reuse detection.
+
+*--pidfd-out-fd* 'fd'::
+    Use specified unix socket FD to send tasks pidfds between
+    pre-dump/dump iterations for pid reuse detection.
+
 *dump*
 ~~~~~~
 Performs a checkpoint procedure.
@@ -419,6 +427,14 @@ The 'mode' may be one of the following:
                 To validate ELF files with their build-ID. If the
                 build-ID cannot be obtained, 'chksm-first' method will be
                 used. This is the default if mode is unspecified.
+
+*--pidfd-in-fd* 'fd'::
+    Use specified unix socket FD to receive tasks pidfds between
+    pre-dump/dump iterations for pid reuse detection.
+
+*--pidfd-out-fd* 'fd'::
+    Use specified unix socket FD to send tasks pidfds between
+    pre-dump/dump iterations for pid reuse detection.
 
 *restore*
 ~~~~~~~~~
