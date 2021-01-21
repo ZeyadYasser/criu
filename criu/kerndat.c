@@ -1052,6 +1052,24 @@ static bool kerndat_has_clone3_set_tid(void)
 	return 0;
 }
 
+static int kerndat_has_pidfd_open(void)
+{
+	int ret;
+
+	ret = syscall(SYS_pidfd_open, getpid(), 0);
+
+	if (ret == -1) {
+		kdat.has_pidfd_open = false;
+	} else {
+		kdat.has_pidfd_open = true;
+	}
+
+	if (close(ret))
+		return -1;
+
+	return 0;
+}
+
 int kerndat_init(void)
 {
 	int ret;
@@ -1183,6 +1201,10 @@ int kerndat_init(void)
 	}
 	if (!ret && has_time_namespace()) {
 		pr_err("has_time_namespace failed when initializing kerndat.\n");
+		ret = -1;
+	}
+	if (!ret && kerndat_has_pidfd_open()) {
+		pr_err("kerndat_has_pidfd_open failed when initializing kerndat.\n");
 		ret = -1;
 	}
 
