@@ -3205,8 +3205,11 @@ int network_lock(void)
 	pr_info("Lock network\n");
 
 	/* Each connection will be locked on dump */
-	if  (!(root_ns_mask & CLONE_NEWNET))
+	if  (!(root_ns_mask & CLONE_NEWNET)) {
+		if (opts.network_lock_method == NETWORK_LOCK_NFTABLES)
+			nftables_init_connection_lock();
 		return 0;
+	}
 
 	if (run_scripts(ACT_NET_LOCK))
 		return -1;
@@ -3225,6 +3228,8 @@ void network_unlock(void)
 		/* coverity[check_return] */
 		run_scripts(ACT_NET_UNLOCK);
 		network_unlock_internal();
+	} else if (opts.network_lock_method == NETWORK_LOCK_NFTABLES) {
+		nftables_network_unlock();
 	}
 }
 
